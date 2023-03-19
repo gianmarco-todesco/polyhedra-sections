@@ -3,48 +3,147 @@
 let canvas, engine, scene, camera, model, section;
 let clipPlane;
 
-let sectionSlider, sectionPanel;
+let sectionSlider, sectionPanel, babylonPanel;
 
 
 window.addEventListener('DOMContentLoaded', ()=> {
     addStyles();
 
     let mainContainer = document.getElementById('main-container');
-    let guiPanel = document.createElement('div');
-    guiPanel.classList.add('gui-panel');
-    
-    addButton(guiPanel, "Tetraedro", ()=>setModel(PolyhedronData.p4));
-    addButton(guiPanel, "Cubo", ()=>setModel(PolyhedronData.p6));
-    addButton(guiPanel, "Ottaedro", ()=>setModel(PolyhedronData.p8));
-    addButton(guiPanel, "Dodecaedro", ()=>setModel(PolyhedronData.p12));
-    addButton(guiPanel, "Icosaedro", ()=>setModel(PolyhedronData.p20));
-    
-    sectionSlider = document.createElement('input');
-    sectionSlider.type = "range";
-    guiPanel.appendChild(sectionSlider)
-    sectionSlider.oninput = () => {
-        console.log(sectionSlider.value);
-        setSection(sectionSlider.value/100.0)
-    }
 
-    mainContainer.appendChild(guiPanel);
+    let row = createBox(mainContainer, 'content');
+
+
+    // section slider
+    let sliderBox = createBox(row, 'slider-box');
+    sectionSlider = createSectionSlider(sliderBox);
+   
+    // 3D view
+    babylonPanel = create3DViewer(row);
+
+    // 2D view
+    sectionPanel = create2DViewer(row);
+
+    let bottomBar = createBox(mainContainer, 'bottom-row');
+    // option menus
+    createPolyhedronChooser(bottomBar)
+    createOrientationChooser(bottomBar)
+    /*
 
     let canvasContainer = document.createElement('div');
     canvasContainer.classList.add('view3d');
     mainContainer.appendChild(canvasContainer);
+    
+    // first column: 2D view (and bottom-bar)
+    let div = document.createElement('div');
+    div.style.flexDirection = "vertical"
+    mainContainer.appendChild(div);
+    // bottombar
+    let bottomBar =  document.createElement('div');
+    div.appendChild(bottomBar);
 
+    
+
+
+    */
+   
+
+    setTimeout(()=>engine.resize(), 500);
+
+})
+
+function createBox(container, id) {
+    let box = document.createElement('div');
+    box.setAttribute('id', id);
+    container.appendChild(box);
+    return box;
+}
+
+function createSectionSlider(container) {
+    let sectionSlider = document.createElement('input');
+    sectionSlider.type = "range";
+    sectionSlider.setAttribute('id', 'section-slider')
+    sectionSlider.setAttribute('orient','vertical')
+    sectionSlider.style.appearance = 'slider-vertical'
+    sectionSlider.style.width = "30px";
+    sectionSlider.oninput = () => {
+        setSection(sectionSlider.value/100.0)
+    }
+    container.appendChild(sectionSlider)
+    return sectionSlider;
+}
+
+function createPolyhedronChooser(container) {
+    
+    let label = document.createElement('label');
+    label.setAttribute('for', 'polyhedron-chooser');
+    let menu = document.createElement('select');
+
+    let ps = ["Tetraedro","Cubo","Ottaedro","Dodecaedro","Icosaedro"];
+    let pvs = [PolyhedronData.p4,PolyhedronData.p6,PolyhedronData.p8,PolyhedronData.p12,PolyhedronData.p20];
+    for(let i=0;i<ps.length;i++) {
+        let itm = document.createElement('option');
+        itm.setAttribute('value', i);
+        itm.innerHTML = ps[i];
+        menu.appendChild(itm)
+        // let btn = addRadioButton(polyhedronChooser, 'polyhedron', 'p-'+i, ps[i], ()=>setModel(pvs[i]));
+        // if(i==0) btn.setAttribute('checked',true)
+    }
+    container.appendChild(label);
+    container.appendChild(menu);
+    menu.onchange = ()=>{ setModel(pvs[menu.value])}
+    
+
+/*
+    let polyhedronChooser = document.createElement('fieldset');
+    guiPanel.appendChild(polyhedronChooser);
+    let legend = document.createElement('legend');
+    legend.innerHTML = "Polyhedron";
+    polyhedronChooser.appendChild(legend);
+
+*/
+    return menu;
+
+}
+
+
+function createOrientationChooser(container) {
+    
+    let label = document.createElement('label');
+    label.setAttribute('for', 'orientation-chooser');
+    let menu = document.createElement('select');
+    menu.classList.add('orientation-chooser')
+    let ps = ["Custom","Vertex","Edge","Face"];
+    let cbs = [
+        ()=>{},
+        ()=>orientModel(model.data.getVertexOrientation(0,1)),
+        ()=>orientModel(model.data.getEdgeOrientation(0)),
+        ()=>orientModel(model.data.getFaceOrientation(0,0))
+    ];
+    for(let i=0;i<ps.length;i++) {
+        let itm = document.createElement('option');
+        itm.setAttribute('value', i);
+        itm.innerHTML = ps[i];
+        menu.appendChild(itm)
+    }
+    container.appendChild(label);
+    container.appendChild(menu);
+    menu.onchange = ()=> cbs[menu.value]();
+    return menu;
+}
+
+
+function create2DViewer(container) {
+    let canvasContainer = createBox(container, 'view2d');
+    let sectionPanel = document.createElement('canvas');
+    canvasContainer.appendChild(sectionPanel);
+    return sectionPanel;
+}
+
+function create3DViewer(container) {
+    let canvasContainer = createBox(container, 'view3d');
     canvas = document.createElement('canvas');
     canvasContainer.appendChild(canvas);
-    
-    canvasContainer = document.createElement('div');
-    canvasContainer.classList.add('view2d');
-    mainContainer.appendChild(canvasContainer);
-
-    sectionPanel = document.createElement('canvas');
-    canvasContainer.appendChild(sectionPanel);
-    
-        
-
 
     engine = new BABYLON.Engine(canvas, true, {deterministicLockstep: true})
     scene = new BABYLON.Scene(engine)
@@ -60,25 +159,13 @@ window.addEventListener('DOMContentLoaded', ()=> {
     light2.parent = camera
 
     populateScene()
-    // createGui();
-    // slide.axes = showWorldAxis(4, scene);
-
     scene.onKeyboardObservable.add(onKeyEvent);
     handlePointer()
-
     engine.runRenderLoop(() => scene.render())
     window.addEventListener("resize", ()=>engine.resize());
-})
-
-
-function cleanup() {
-    window.removeEventListener("resize", onResize)
-    engine.stopRenderLoop()    
-    scene.dispose()
-    engine.dispose()
-    scene = null;
-    engine = null;
+    return canvas;
 }
+
 
 function addButton(container, name, cb) {
     let btn = document.createElement('button');
@@ -88,7 +175,25 @@ function addButton(container, name, cb) {
     return btn;
 }
 
+function addRadioButton(container, groupName, id, name, cb) {
+    let div = document.createElement('div');
+    container.appendChild(div);
+    let btn = document.createElement('input');
+    btn.setAttribute('type', 'radio');
+    btn.setAttribute('name', groupName);
+    btn.setAttribute('id', id);
+    btn.setAttribute('value', id);
+    div.appendChild(btn);
+    let label = document.createElement('label');
+    label.setAttribute('for', id);
+    label.innerHTML = name;
+    div.appendChild(label);
+    btn.onclick = cb;
+    return btn;
+}
+
 function handlePointer() {
+    return;
     let status = 0
     let oldx, oldy
     scene.onPointerObservable.add(pointerInfo => {
@@ -106,12 +211,9 @@ function handlePointer() {
     });
     function onpointerdown(pointerInfo) {
         //console.log(pointerInfo)
+        status = 0;
         if(pointerInfo.pickInfo.pickedMesh) {
-            //console.log(pointerInfo.pickInfo.pickedMesh.name)
-        }
-        if(pointerInfo.event.offsetX<100) {
-            status = 1
-        } else if(pointerInfo.pickInfo.pickedMesh) {
+            console.log(pointerInfo.pickInfo.pickedMesh.name)
             status = 2
         }
         if(status != 0) {
@@ -364,15 +466,92 @@ function createPaper() {
 
 
 function setModel(data) {
-    if(model) model.pivot.dispose();                
+    if(model) {
+        // todo: togliere le azioni
+        model.pivot.dispose();
+    }                
     model = new Polyhedron('a',data,scene);
     model.facesMesh.material.clipPlane = clipPlane;
     let r = model.data.vertices[0].length() * model.scaleFactor;
     model.radius = r;
     model.pivot.position.y = -r;
     model.pivot.rotationQuaternion = new BABYLON.Quaternion();
+    console.log(model.facesMesh)
+    setActions()
+    
+
+    /*
+    actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction({
+                trigger: BABYLON.ActionManager.OnPointerOutTrigger
+            }, ()=>console.log("OUT"+performance.now()))
+    );
+    actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction({
+                trigger: BABYLON.ActionManager.OnPickTrigger
+            }, ()=>console.log("ops"+performance.now()))
+    );
+    */
+
     setSectionRangeValue(0);
 }
+
+
+function setActions() {
+    let actionManager = model.facesMesh.actionManager = new BABYLON.ActionManager(scene);
+    
+    let hlColor = new BABYLON.Color3(0.3,0.3,0.1);
+    let normalColor = new BABYLON.Color3(0.0,0.0,0.0);
+    
+    actionManager.registerAction(
+        new BABYLON.InterpolateValueAction( 
+            BABYLON.ActionManager.OnPointerOverTrigger, model.edge.material, 'emissiveColor', hlColor, 100 )
+    );
+    actionManager.registerAction(
+        new BABYLON.InterpolateValueAction( 
+            BABYLON.ActionManager.OnPointerOutTrigger, model.edge.material, 'emissiveColor', normalColor, 50 )
+    );    
+    actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction({
+                trigger: BABYLON.ActionManager.OnPickDownTrigger
+            }, startRotateObject)
+    );
+}
+
+
+function startRotateObject() {
+    console.log("Yup!!");
+    camera.detachControl(canvas);
+    let oldx,oldy;
+
+    let f = scene.onPointerObservable.add(pointerInfo => {
+        switch (pointerInfo.type) {
+            case BABYLON.PointerEventTypes.POINTERDOWN:
+                console.log("uh oh???");
+                oldx = pointerInfo.event.offsetX;
+                oldy = pointerInfo.event.offsetY;
+                
+                break
+            case BABYLON.PointerEventTypes.POINTERUP:
+                console.log("prova")
+
+                scene.onPointerObservable.remove(f);
+                camera.attachControl(canvas);
+                break
+            case BABYLON.PointerEventTypes.POINTERMOVE:
+                console.log("yeeee")
+
+                let x = pointerInfo.event.offsetX
+                let y = pointerInfo.event.offsetY
+                let dx = x-oldx
+                let dy = y-oldy
+                oldx = x
+                oldy = y
+                rotateObject(dx,dy);
+        }
+    });
+}
+
 
 function orientModel(q) {
     let obj = model.pivot;
@@ -444,30 +623,24 @@ function updateSectionPanel() {
 
 
 function addStyles() {
-    
     let style = document.createElement('style');
     style.innerHTML = `
-        #main-container {
+        #content {
             display:flex;
             flex-direction:row;
-            border:solid 4px red;
-            width:90%;
+            align-items:stretch;
         }
-        .gui-panel {
-            width:150px;
-            flex:initial;
+        #section-slider {
+            height:90%;
         }
-        .view3d {
+        #view3d {
             flex:1 1 0;
-            border:solid 1px gray;    
             aspect-ratio:1;
             
         }
-        .view2d {
+        #view2d {
             flex:1 1 0;           
-            border:solid 1px gray;      
-            aspect-ratio:1;
-            
+            aspect-ratio:1;            
         }
         canvas {
             border:0;
@@ -475,6 +648,7 @@ function addStyles() {
             width:100%;
             height:100%;
         }
+        
     `;
     document.head.appendChild(style);
 }
